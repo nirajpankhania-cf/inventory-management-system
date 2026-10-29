@@ -107,3 +107,31 @@ def test_search_results_are_sorted_by_name(connection):
 def test_search_text_is_never_run_as_sql(connection):
     assert inventory_db.search_products(connection, "'; DROP TABLE products; --") == []
     assert len(inventory_db.search_products(connection)) == 12
+
+"""report checks ================================================================"""
+def test_stock_value_by_supplier(connection):
+    rows = inventory_db.stock_value_by_supplier(connection)
+    assert [(r["supplier_name"], r["stock_value_cents"]) for r in rows] == [
+        ("Stanley Tools", 58160),
+        ("Dulux Paints", 50667),
+        ("Screwfix Supply", 40400),
+        ("Draper", 34393),
+    ]
+
+def test_low_stock(connection):
+    rows = inventory_db.low_stock(connection)
+    assert [(r["sku"], r["shortfall"]) for r in rows] == [
+        ("WRE-004", 2),
+        ("TAP-003", 2),
+        ("NAL-009", 0),
+    ]
+
+def test_sales_by_product(connection):
+    rows = inventory_db.sales_by_product(connection)
+    assert len(rows) == 10
+    assert (rows[0]["sku"], rows[0]["units_sold"], rows[0]["revenue_cents"]) == ("DRL-011", 1, 7999)
+    assert (rows[2]["sku"], rows[2]["units_sold"], rows[2]["revenue_cents"]) == ("HAM-001", 3, 3797)
+
+def test_never_sold(connection):
+    rows = inventory_db.never_sold(connection)
+    assert [r["sku"] for r in rows] == ["WRE-004", "SAW-012"]

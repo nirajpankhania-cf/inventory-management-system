@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
@@ -188,3 +189,11 @@ def record_sale(connection, items, when=None):
             )
             _log_movement(connection, product_id, -quantity, "sale", when)
         return sale_id
+
+def backup_database(source_path, backup_path):
+    """copy a live database using sqlite backup api. returns backup path"""
+    backup_path = Path(backup_path)
+    backup_path.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(source_path)) as source, closing(sqlite3.connect(backup_path)) as destination:
+        source.backup(destination)
+    return backup_path

@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -201,3 +202,16 @@ def test_sale_for_unknown_product_changes_nothing(connection):
     assert connection.execute("SELECT COUNT(*) FROM sales").fetchone()[0] == 5
     assert connection.execute("SELECT COUNT(*) FROM stock_movements").fetchone()[0] == 0
     assert inventory_db.get_product(connection, 1)["quantity"] == 25
+
+# backup ================================================================
+def test_backup_passes_integrity_check_and_matches_row_counts(connection, tmp_path):
+    source = tmp_path / "live.db"
+    backup = tmp_path / "backup.db"
+    with closing(sqlite3.connect(source)) as file_db:
+        connection.backup(file_db)
+    inventory_db.backup_database(source, backup)
+    with closing(inventory_db.connect(backup)) as copy:
+        assert copy.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        for table in ["suppliers", "products", "sales", "sale_items", "stock_movements"]:
+            expected = connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            assert copy.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0] == expected

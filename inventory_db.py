@@ -30,3 +30,21 @@ def get_product(connection, product_id):
         "where p.id = ?",
         (product_id,),
     ).fetchone()
+
+def update_price(connection, product_id, price):
+    """set a new price for a product"""
+    cursor = connection.execute(
+        "UPDATE products SET unit_price_cents = ? where id = ?",
+        (price, product_id),
+    )
+    connection.commit()
+    return cursor.rowcount == 1
+
+def delete_product(connection, product_id):
+    """delete product"""
+    cursor = connection.execute(
+        "DELETE FROM products WHERE id = ?",
+        (product_id,)
+    )
+    connection.commit()
+    return cursor.rowcount == 1

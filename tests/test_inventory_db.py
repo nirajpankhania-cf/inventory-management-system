@@ -46,3 +46,22 @@ def test_add_product_refuses_bad_data(connection, sku, supplier_id, price, quant
 
 def test_get_product_returns_none_when_missing(connection):
     assert inventory_db.get_product(connection, 999) is None
+
+def test_update_price_changes_price(connection):
+    assert inventory_db.update_price(connection, 1, 1399) is True
+    assert inventory_db.get_product(connection, 1)["unit_price_cents"] == 1399
+
+def test_update_price_for_missing_product_returns_false(connection):
+    assert inventory_db.update_price(connection, 999, 1399) is False
+
+def test_update_price_rejects_negative(connection):
+    with pytest.raises(sqlite3.IntegrityError):
+        inventory_db.update_price(connection, 1, -1)
+
+def test_sold_product_cannot_be_deleted(connection):
+    with pytest.raises(sqlite3.IntegrityError):
+        inventory_db.delete_product(connection, 1)
+
+def test_never_sold_product_can_be_deleted(connection):
+    assert inventory_db.delete_product(connection, 4) is True
+    assert inventory_db.get_product(connection, 4) is None

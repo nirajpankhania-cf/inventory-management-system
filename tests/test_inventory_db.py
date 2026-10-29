@@ -153,3 +153,16 @@ def test_restock_of_zero_or_less_is_refused(connection, amount):
         inventory_db.restock(connection, 3, amount)
     assert inventory_db.get_product(connection, 3)["quantity"] == 3
     assert connection.execute("SELECT COUNT(*) FROM stock_movements").fetchall()
+
+def test_adjust_stock_changes_stock_and_logs_movement(connection):
+    assert inventory_db.adjust_stock(connection, 1, -2, when="2026-10-29T09:00:00") == 23
+    movements = connection.execute("SELECT product_id, change, reason FROM stock_movements").fetchall()
+    assert [tuple(m) for m in movements] == [(1, -2, "adjustment")]
+
+def test_adjust_stock_cannot_go_negative_and_changes_nothing(connection):
+    with pytest.raises(sqlite3.IntegrityError):
+        inventory_db.adjust_stock(connection, 3, -10)
+    assert inventory_db.get_product(connection, 3)["quantity"] == 3
+    assert connection.execute(
+        "SELECT COUNT(*) FROM stock_movements"
+    ).fetchone()[0] == 0

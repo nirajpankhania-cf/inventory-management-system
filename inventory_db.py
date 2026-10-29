@@ -137,3 +137,21 @@ def restock(connection, product_id, amount, when=None):
         "SELECT quantity FROM products WHERE id = ?",
         (product_id,)
     ).fetchone()["quantity"]
+
+def adjust_stock(connection, product_id, change, when=None):
+    """change a products stock amoutn and log adjustment. return new stock level"""
+    if change == 0:
+        raise ValueError("change amount must be greater than zero")
+    when = when or datetime.now().isoformat(timespec="seconds")
+    with connection:
+        cursor = connection.execute(
+            "UPDATE products SET quantity = quantity + ? WHERE id = ?",
+            (change, product_id),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError(f"no product with product id {product_id}")
+        _log_movement(connection, product_id, change, "adjustment", when)
+    return connection.execute(
+        "SELECT quantity FROM products WHERE id = ?",
+        (product_id,),
+    ).fetchone()["quantity"]

@@ -135,3 +135,21 @@ def test_sales_by_product(connection):
 def test_never_sold(connection):
     rows = inventory_db.never_sold(connection)
     assert [r["sku"] for r in rows] == ["WRE-004", "SAW-012"]
+
+# restock tests. =============================================================
+def test_restock_increases_stock_and_logs_one_movement(connection):
+    new_quantity = inventory_db.restock(connection, 3, 10, when="2026-10-29T09:00:00")
+    assert new_quantity == 13
+    assert inventory_db.get_product(connection, 3)["quantity"] == 13
+    movements = connection.execute(
+        "SELECT product_id, change, reason, moved_at FROM stock_movements"
+    ).fetchall()
+    assert [tuple(m) for m in movements] == [(3, 10, "restock", "2026-10-29T09:00:00")]
+
+@pytest.mark.parametrize("amount", [0, -5])
+
+def test_restock_of_zero_or_less_is_refused(connection, amount):
+    with pytest.raises(ValueError):
+        inventory_db.restock(connection, 3, amount)
+    assert inventory_db.get_product(connection, 3)["quantity"] == 3
+    assert connection.execute("SELECT COUNT(*) FROM stock_movements").fetchall()

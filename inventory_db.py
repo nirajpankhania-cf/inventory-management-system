@@ -1,8 +1,17 @@
 import os
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 DB_PATH = Path(os.environ.get("INVENTORY_DB", Path(__file__).parent / "inventory.db"))
+
+def _log_movement(connection, product_id, change, reason, when):
+    """insert one stock movement"""
+    connection.execute(
+        "INSERT INTO stock_movements (product_id, change, reason, moved_at) "
+        "VALUES (?, ?, ?, ?)",
+        (product_id, change, reason, when),
+    )
 
 def connect(path=DB_PATH):
     """open a connection with foreign keys on and rows readable by col name."""
@@ -110,3 +119,21 @@ def never_sold(connection):
         "WHERE si.product_id is NULL "
         "ORDER BY p.name"
     ).fetchall()
+
+def restock(connection, product_id, amount, when=None):
+    """increases a product's stock and logs restock mvement. return new stock level"""
+    if amount <= 0:
+        raise ValueError('restock amount must be greater than zero')
+    when = when or datetime.now().isoformat(timespec="seconds")
+    with connection:
+        cursor = connection.execute(
+            "UPDATE products SET quantity = quantity + ? WHERE id = ?",
+            (amount, product_id),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError(f"no product with product id {product_id}")
+        _log_movement(connection, product_id, amount, "restock", when)
+    return connection.execute(
+        "SELECT quantity FROM products WHERE id = ?",
+        (product_id,)
+    ).fetchone()["quantity"]

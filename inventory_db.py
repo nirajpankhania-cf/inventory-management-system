@@ -120,6 +120,7 @@ def never_sold(connection):
         "ORDER BY p.name"
     ).fetchall()
 
+# stock manipulation ================================================================
 def restock(connection, product_id, amount, when=None):
     """increases a product's stock and logs restock mvement. return new stock level"""
     if amount <= 0:
@@ -155,3 +156,35 @@ def adjust_stock(connection, product_id, change, when=None):
         "SELECT quantity FROM products WHERE id = ?",
         (product_id,),
     ).fetchone()["quantity"]
+
+def record_sale(connection, items, when=None):
+    """ record a sale of productid, quantity, pairs at current prices. returns new sale id
+        all steps need to happen or none do
+    """
+    if not items:
+        raise ValueError("a sale needs at least one item")
+    when = when or datetime.now().isoformat(timespec="seconds")
+    with connection:
+        cursor = connection.execute(
+            "INSERT INTO sales (sold_at) VALUES (?)",
+            (when,)
+        )
+        sale_id = cursor.lastrowid
+        for product_id, quantity in items:
+            product = connection.execute(
+                "SELECT unit_price_cents FROM products WHERE id = ?",
+                (product_id,),
+            ).fetchone()
+            if product is None:
+                raise ValueError(f"no product with product id {product_id}")
+            connection.execute(
+                "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price_cents) "
+                "VALUES (?, ?, ?, ?)",
+                (sale_id, product_id, quantity, product["unit_price_cents"]),
+            )
+            connection.execute(
+                "UPDATE products SET quantity = quantity - ? WHERE id = ?",
+                (quantity, product_id)
+            )
+            _log_movement(connection, product_id, -quantity, "sale", when)
+        return sale_id

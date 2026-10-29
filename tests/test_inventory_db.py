@@ -154,6 +154,7 @@ def test_restock_of_zero_or_less_is_refused(connection, amount):
     assert inventory_db.get_product(connection, 3)["quantity"] == 3
     assert connection.execute("SELECT COUNT(*) FROM stock_movements").fetchall()
 
+# adjust stock checks =================================================================
 def test_adjust_stock_changes_stock_and_logs_movement(connection):
     assert inventory_db.adjust_stock(connection, 1, -2, when="2026-10-29T09:00:00") == 23
     movements = connection.execute("SELECT product_id, change, reason FROM stock_movements").fetchall()
@@ -166,3 +167,37 @@ def test_adjust_stock_cannot_go_negative_and_changes_nothing(connection):
     assert connection.execute(
         "SELECT COUNT(*) FROM stock_movements"
     ).fetchone()[0] == 0
+
+# record sale checks ==============================================================
+def test_record_sale_records_lines_reduces_stock_and_logs_movements(connection):
+    sale_id = inventory_db.record_sale(connection, [(1, 2), (3, 1)], when="2026-10-29T10:00:00")
+    assert sale_id == 6
+    lines = connection.execute(
+        "SELECT product_id, quantity, unit_price_cents FROM sale_items WHERE sale_id = ? ORDER BY product_id",
+        (sale_id,),
+    ).fetchall()
+    assert [tuple(line) for line in lines] == [(1, 2, 1299), (3, 1, 799)]
+    assert inventory_db.get_product(connection, 1)["quantity"] == 23
+    assert inventory_db.get_product(connection, 3)["quantity"] == 2
+    movements = connection.execute(
+        "SELECT product_id, change, reason FROM stock_movements ORDER BY product_id",
+    ).fetchall()
+    assert [tuple(m) for m in movements] == [(1, -2, "sale"), (3, -1, "sale")]
+
+def test_failed_sale_changes_nothing(connection):
+    sales_before = connection.execute("SELECT COUNT(*) FROM sales").fetchone()[0]
+    lines_before = connection.execute("SELECT COUNT(*) FROM sale_items").fetchone()[0]
+    with pytest.raises(sqlite3.IntegrityError):
+        inventory_db.record_sale(connection, [(1, 2), (3, 99)])
+    assert connection.execute("SELECT COUNT(*) FROM sales").fetchone()[0] == sales_before
+    assert connection.execute("SELECT COUNT(*) FROM sale_items").fetchone()[0] == lines_before
+    assert connection.execute("SELECT COUNT(*) FROM stock_movements").fetchone()[0] == 0
+    assert inventory_db.get_product(connection, 1)["quantity"] == 25
+    assert inventory_db.get_product(connection, 3)["quantity"] == 3
+
+def test_sale_for_unknown_product_changes_nothing(connection):
+    with pytest.raises(ValueError):
+        inventory_db.record_sale(connection, [(1,1), (999, 1)])
+    assert connection.execute("SELECT COUNT(*) FROM sales").fetchone()[0] == 5
+    assert connection.execute("SELECT COUNT(*) FROM stock_movements").fetchone()[0] == 0
+    assert inventory_db.get_product(connection, 1)["quantity"] == 25

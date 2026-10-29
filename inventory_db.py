@@ -72,3 +72,41 @@ def search_products(connection, text="", category=None, max_price_cents=None, in
         sql += " AND p.quantity <= p.reorder_level"
     sql += " ORDER by p.name"
     return connection.execute(sql, params).fetchall()
+
+"""Reports ============================================"""
+def stock_value_by_supplier(connection):
+    """each suppliers name and total value of its stock descending"""
+    return connection.execute(
+        "SELECT s.name AS supplier_name, "
+        "SUM(p.unit_price_cents * p.quantity) AS stock_value_cents "
+        "FROM suppliers s JOIN products p ON p.supplier_id = s.id "
+        "GROUP BY s.id, s.name "
+        "ORDER BY stock_value_cents DESC"
+    ).fetchall()
+
+def low_stock(connection):
+    """return low stock (products below their reorder level) descending"""
+    return connection.execute(
+        "SELECT sku, name, quantity, reorder_level, reorder_level - quantity AS shortfall "
+        "FROM products WHERE quantity <= reorder_level "
+        "ORDER BY shortfall DESC, name"
+    ).fetchall()
+
+def sales_by_product(connection):
+    """each sold product with units and revenue in cents descending"""
+    return connection.execute(
+        "SELECT p.sku, p.name, SUM(si.quantity) as units_sold, "
+        "SUM(si.quantity * si.unit_price_cents) AS revenue_cents "
+        "FROM products p JOIN sale_items si ON si.product_id = p.id "
+        "GROUP BY p.id, p.sku, p.name "
+        "ORDER BY revenue_cents DESC"
+    ).fetchall()
+
+def never_sold(connection):
+    """products that have no sales"""
+    return connection.execute(
+        "SELECT p.sku, p.name FROM products p "
+        "LEFT JOIN sale_items si ON si.product_id = p.id "
+        "WHERE si.product_id is NULL "
+        "ORDER BY p.name"
+    ).fetchall()

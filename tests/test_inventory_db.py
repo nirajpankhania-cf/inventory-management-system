@@ -29,3 +29,20 @@ def test_add_product_returns_new_id(connection):
     new_id = inventory_db.add_product(connection, "LAD-013", "Step Ladder", "Tools", 2, 4999, 5, 1)
     assert new_id == 13
     assert inventory_db.get_product(connection, new_id)["name"] == "Step Ladder"
+
+@pytest.mark.parametrize(
+    "sku, supplier_id, price, quantity",
+    [
+        ("HAM-001", 1, 1299, 5), #duplicate sku
+        ("NEW-009", 99, 199, 5), #unknown supplier
+        ("NEW-099", 1, -1, 5), #negative price
+        ("NEW-099", 1, 1299, -1), #negative quantity
+    ]
+)
+
+def test_add_product_refuses_bad_data(connection, sku, supplier_id, price, quantity):
+    with pytest.raises(sqlite3.IntegrityError):
+        inventory_db.add_product(connection, sku, "Thing", "Tools", supplier_id, price, quantity)
+
+def test_get_product_returns_none_when_missing(connection):
+    assert inventory_db.get_product(connection, 999) is None

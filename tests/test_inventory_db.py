@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+import inventory_db
+
 SCHEMA = Path(__file__).parent.parent / "schema.sql"
 
 def test_sample_data_has_expected_row_counts(connection):
@@ -22,3 +24,8 @@ def test_movement_with_invalid_reason_is_refused(connection):
             "VALUES (?, ?, ?, ?)",
             (1, 5, "theft", "2026-10-28T10:00:00"),
         )
+
+def test_add_product_returns_new_id(connection):
+    new_id = inventory_db.add_product(connection, "LAD-013", "Step Ladder", "Tools", 2, 4999, 5, 1)
+    assert new_id == 13
+    assert inventory_db.get_product(connection, new_id)["name"] == "Step Ladder"

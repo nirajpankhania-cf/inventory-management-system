@@ -10,3 +10,23 @@ def connect(path=DB_PATH):
     connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
     return connection
+
+def add_product(connection, sku, name, category, supplier_id, unit_price_cents, quantity=0, reorder_level=0):
+    """add a product and return its new id."""
+    cursor = connection.execute(
+        "INSERT INTO products (sku, name, category, supplier_id, unit_price_cents, quantity, reorder_level)"
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (sku, name, category, supplier_id, unit_price_cents, quantity, reorder_level),
+    )
+    connection.commit()
+    return cursor.lastrowid
+
+def get_product(connection, product_id):
+    """return one product as a row"""
+    return connection.execute(
+        "SELECT p.id, p.sku, p.name, p.category, s.name AS supplier_name, p.unit_price_cents, p.quantity, p.reorder_level "
+        "FROM products p "
+        "JOIN suppliers s ON s.id = p.supplier_id "
+        "where p.id = ?",
+        (product_id,),
+    ).fetchone()

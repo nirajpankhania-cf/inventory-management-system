@@ -1,8 +1,17 @@
 import os
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 DB_PATH = Path(os.environ.get("INVENTORY_DB", Path(__file__).parent / "inventory.db"))
+
+def _log_movement(connection, product_id, change, reason, when):
+    """insert one stock movement"""
+    connection.execute(
+        "INSERT INTO stock_movements (product_id, change, reason, moved_at) "
+        "VALUES (?, ?, ?, ?)",
+        (product_id, change, reason, when),
+    )
 
 def connect(path=DB_PATH):
     """open a connection with foreign keys on and rows readable by col name."""
@@ -110,3 +119,72 @@ def never_sold(connection):
         "WHERE si.product_id is NULL "
         "ORDER BY p.name"
     ).fetchall()
+
+# stock manipulation ================================================================
+def restock(connection, product_id, amount, when=None):
+    """increases a product's stock and logs restock mvement. return new stock level"""
+    if amount <= 0:
+        raise ValueError('restock amount must be greater than zero')
+    when = when or datetime.now().isoformat(timespec="seconds")
+    with connection:
+        cursor = connection.execute(
+            "UPDATE products SET quantity = quantity + ? WHERE id = ?",
+            (amount, product_id),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError(f"no product with product id {product_id}")
+        _log_movement(connection, product_id, amount, "restock", when)
+    return connection.execute(
+        "SELECT quantity FROM products WHERE id = ?",
+        (product_id,)
+    ).fetchone()["quantity"]
+
+def adjust_stock(connection, product_id, change, when=None):
+    """change a products stock amoutn and log adjustment. return new stock level"""
+    if change == 0:
+        raise ValueError("change amount must be greater than zero")
+    when = when or datetime.now().isoformat(timespec="seconds")
+    with connection:
+        cursor = connection.execute(
+            "UPDATE products SET quantity = quantity + ? WHERE id = ?",
+            (change, product_id),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError(f"no product with product id {product_id}")
+        _log_movement(connection, product_id, change, "adjustment", when)
+    return connection.execute(
+        "SELECT quantity FROM products WHERE id = ?",
+        (product_id,),
+    ).fetchone()["quantity"]
+
+def record_sale(connection, items, when=None):
+    """ record a sale of productid, quantity, pairs at current prices. returns new sale id
+        all steps need to happen or none do
+    """
+    if not items:
+        raise ValueError("a sale needs at least one item")
+    when = when or datetime.now().isoformat(timespec="seconds")
+    with connection:
+        cursor = connection.execute(
+            "INSERT INTO sales (sold_at) VALUES (?)",
+            (when,)
+        )
+        sale_id = cursor.lastrowid
+        for product_id, quantity in items:
+            product = connection.execute(
+                "SELECT unit_price_cents FROM products WHERE id = ?",
+                (product_id,),
+            ).fetchone()
+            if product is None:
+                raise ValueError(f"no product with product id {product_id}")
+            connection.execute(
+                "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price_cents) "
+                "VALUES (?, ?, ?, ?)",
+                (sale_id, product_id, quantity, product["unit_price_cents"]),
+            )
+            connection.execute(
+                "UPDATE products SET quantity = quantity - ? WHERE id = ?",
+                (quantity, product_id)
+            )
+            _log_movement(connection, product_id, -quantity, "sale", when)
+        return sale_id

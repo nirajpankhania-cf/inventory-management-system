@@ -48,3 +48,27 @@ def delete_product(connection, product_id):
     )
     connection.commit()
     return cursor.rowcount == 1
+
+def search_products(connection, text="", category=None, max_price_cents=None, in_stock_only=False, low_stock_only=False):
+    """find products whose name, sku, or name contains text, with optional filters"""
+    sql = (
+        "SELECT p.id, p.sku, p.name, p.category, s.name AS supplier_name, p.unit_price_cents, p.quantity, p.reorder_level "
+        "FROM products p "
+        "JOIN suppliers s ON s.id = p.supplier_id "
+        "WHERE (p.name LIKE ? OR p.sku LIKE ? OR s.name LIKE ?)"
+    )
+
+    pattern = f"%{text}%"
+    params = [pattern, pattern, pattern] # match three q marks above
+    if category is not None:
+        sql += " AND p.category = ?"
+        params.append(category)
+    if max_price_cents is not None:
+        sql += " AND p.unit_price_cents <= ?"
+        params.append(max_price_cents)
+    if in_stock_only:
+        sql += " AND p.quantity > 0"
+    if low_stock_only:
+        sql += " AND p.quantity <= p.reorder_level"
+    sql += " ORDER by p.name"
+    return connection.execute(sql, params).fetchall()

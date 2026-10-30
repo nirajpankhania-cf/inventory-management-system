@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 - 2026-10-30
+
+- The menus shows how many producs are at or below their reorder level.
+
 ## 1.0.0 - 2026-10-29
 
 First release.

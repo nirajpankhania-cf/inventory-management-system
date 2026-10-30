@@ -190,7 +190,54 @@ docker run -it --name inventory -v inventory-data:/data inventory:1.0.0
 Rollback output:
 
 ```
-paste in
+(.venv) Niraj.Pankhania@Nirajs-MacBook-Pro inventory-management-system % docker run -it --rm -v inventory-data:/data inventory:1.1.0
+3 products at or below reorder level.
+
+Inventory
+  1) Search products
+  2) Look up a product
+  3) Add a product
+  4) Restock
+  5) Record a sale
+  6) Report: stock value by supplier
+  7) Report: low stock
+  8) Report: sales by product
+  9) Report: never sold
+  b) Back up the database
+  q) Quit
+Choose: q
+(.venv) Niraj.Pankhania@Nirajs-MacBook-Pro inventory-management-system % docker run -it --rm -v inventory-data:/data inventory:1.0.0
+
+
+Inventory
+  1) Search products
+  2) Look up a product
+  3) Add a product
+  4) Restock
+  5) Record a sale
+  6) Report: stock value by supplier
+  7) Report: low stock
+  8) Report: sales by product
+  9) Report: never sold
+  b) Back up the database
+  q) Quit
+Choose: 2
+Product id: 3
+3. TAP-003 Tape Measure 5m (Tools) from Draper, 7.99, 4 in stock, reorder at 5
+
+Inventory
+  1) Search products
+  2) Look up a product
+  3) Add a product
+  4) Restock
+  5) Record a sale
+  6) Report: stock value by supplier
+  7) Report: low stock
+  8) Report: sales by product
+  9) Report: never sold
+  b) Back up the database
+  q) Quit
+Choose: q
 ```
 
 ## Back up and restore

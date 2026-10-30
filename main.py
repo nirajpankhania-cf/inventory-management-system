@@ -177,6 +177,8 @@ COMMANDS = {
 
 def main():
     with closing(db.connect()) as connection:
+        low = len(db.low_stock(connection))
+        print(f"{low} product{'s' if low != 1 else ''} at or below reorder level.")
         while True:
             print("\nInventory")
             for key, (label, _) in COMMANDS.items():
